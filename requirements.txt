@@ -1,8 +1,7 @@
-streamlit
 fastapi
 uvicorn
 sqlalchemy
 requests
 twilio
-streamlit-autorefresh
 python-multipart
+openai
