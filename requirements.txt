@@ -1,8 +1,9 @@
+streamlit
+pandas
+sqlalchemy
+openai
 fastapi
 uvicorn
-streamlit
-sqlalchemy
 requests
 twilio
-openai
 python-multipart
