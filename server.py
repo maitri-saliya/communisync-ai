@@ -1,42 +1,47 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
+from fastapi import Request
 from fastapi.responses import Response
-
-import os
-
-from openai import OpenAI
 
 from database import SessionLocal
 from models import Issue
 
+from twilio.rest import Client
 
-# -----------------------------------
-# APP
-# -----------------------------------
+from openai import OpenAI
+
+from teams import TEAM_NUMBERS
+
+import os
+
 
 app = FastAPI()
 
 
-# -----------------------------------
-# OPENAI CLIENT
-# -----------------------------------
-
 client = OpenAI(
-    api_key=os.getenv("OPENAI_API_KEY")
+    api_key=os.getenv(
+        "OPENAI_API_KEY"
+    )
 )
 
 
-# -----------------------------------
-# AI CLASSIFICATION
-# -----------------------------------
+twilio = Client(
+
+    os.getenv(
+        "TWILIO_ACCOUNT_SID"
+    ),
+
+    os.getenv(
+        "TWILIO_AUTH_TOKEN"
+    )
+)
+
 
 def classify_issue(message):
 
     prompt = f"""
-You are CommuniSync AI.
+Analyze request.
 
-Analyze the community request.
-
-Return ONLY this format:
+Return ONLY:
 
 Category:
 Priority:
@@ -45,190 +50,209 @@ Suggested Action:
 
 Request:
 {message}
-
-Rules:
-- Safety concerns → High Priority
-- Infrastructure → Maintenance
-- Social support → Community Team
-- Keep response concise
 """
 
-    try:
+    result = client.chat.completions.create(
 
-        response = client.chat.completions.create(
-            model="gpt-5-mini",
+        model="gpt-5-mini",
 
-            messages=[
-                {
-                    "role": "system",
-                    "content": prompt
-                }
-            ]
-        )
+        messages=[
 
-        return response.choices[0].message.content
+            {
+                "role":
+                "system",
 
-    except Exception:
+                "content":
+                prompt
+            }
+        ]
+    )
 
-        return """
-Category: General
-Priority: Medium
-Assigned Team: Community Team
-Suggested Action:
-Manual review required
-"""
+    return (
+        result
+        .choices[0]
+        .message
+        .content
+    )
 
 
-# -----------------------------------
-# PARSER
-# -----------------------------------
+def extract(text, field):
 
-def extract_field(text, field):
+    for line in text.splitlines():
 
-    try:
+        if line.lower().startswith(
+            field.lower()
+        ):
 
-        for line in text.splitlines():
-
-            if line.lower().startswith(
-                field.lower()
-            ):
-
-                return (
-                    line
-                    .split(":", 1)[1]
-                    .strip()
-                )
-
-    except:
-        pass
+            return (
+                line
+                .split(":", 1)[1]
+                .strip()
+            )
 
     return "Unknown"
 
 
-# -----------------------------------
-# REQUEST ID
-# -----------------------------------
+def notify_team(
 
-def generate_request_id(issue_id):
+    request_id,
 
-    return f"CS-{str(issue_id).zfill(3)}"
+    team,
 
+    issue,
 
-# -----------------------------------
-# WHATSAPP WEBHOOK
-# -----------------------------------
+    priority,
 
-@app.post("/whatsapp")
-
-async def whatsapp_reply(
-    request: Request
+    action
 ):
 
-    try:
+    phone = TEAM_NUMBERS.get(
+        team
+    )
 
-        form = await request.form()
+    if not phone:
+        return
 
-        incoming_msg = (
-            form.get("Body", "")
-            .strip()
-        )
+    text = f"""
+🚨 CommuniSync Alert
 
-        if not incoming_msg:
+Request:
+{request_id}
 
-            xml = """
-<Response>
-<Message>
-Please send a valid request.
-</Message>
-</Response>
-"""
+Issue:
+{issue}
 
-            return Response(
-                content=xml,
-                media_type="application/xml"
-            )
-
-        # -----------------
-        # AI
-        # -----------------
-
-        ai_result = classify_issue(
-            incoming_msg
-        )
-
-        category = extract_field(
-            ai_result,
-            "Category"
-        )
-
-        priority = extract_field(
-            ai_result,
-            "Priority"
-        )
-
-        assigned_team = extract_field(
-            ai_result,
-            "Assigned Team"
-        )
-
-        action = extract_field(
-            ai_result,
-            "Suggested Action"
-        )
-
-        # -----------------
-        # SAVE
-        # -----------------
-
-        db = SessionLocal()
-
-        issue = Issue(
-
-            message=incoming_msg,
-
-            category=category,
-
-            priority=priority,
-
-            assigned_team=assigned_team,
-
-            status="Pending"
-        )
-
-        db.add(issue)
-
-        db.commit()
-
-        db.refresh(issue)
-
-        request_id = generate_request_id(
-            issue.id
-        )
-
-        db.close()
-
-        # -----------------
-        # RESPONSE
-        # -----------------
-
-        reply = f"""
-CommuniSync AI
-
-Request ID: {request_id}
-
-Category: {category}
-
-Priority: {priority}
-
-Assigned Team: {assigned_team}
+Priority:
+{priority}
 
 Suggested Action:
 {action}
-
-Your request has been routed successfully.
 """
 
-        xml = f"""
+    twilio.messages.create(
+
+        from_=os.getenv(
+            "TWILIO_WHATSAPP_NUMBER"
+        ),
+
+        to=phone,
+
+        body=text
+    )
+
+
+@app.post(
+    "/whatsapp"
+)
+
+async def whatsapp(
+    request: Request
+):
+
+    form = await request.form()
+
+    message = (
+        form
+        .get(
+            "Body",
+            ""
+        )
+    )
+
+    result = (
+        classify_issue(
+            message
+        )
+    )
+
+    category = extract(
+        result,
+        "Category"
+    )
+
+    priority = extract(
+        result,
+        "Priority"
+    )
+
+    team = extract(
+        result,
+        "Assigned Team"
+    )
+
+    action = extract(
+        result,
+        "Suggested Action"
+    )
+
+    db = SessionLocal()
+
+    issue = Issue(
+
+        message=message,
+
+        category=category,
+
+        priority=priority,
+
+        assigned_team=team,
+
+        suggested_action=action,
+
+        status="Pending"
+    )
+
+    db.add(
+        issue
+    )
+
+    db.commit()
+
+    db.refresh(
+        issue
+    )
+
+    request_id = (
+        f"CS-{issue.id}"
+    )
+
+    notify_team(
+
+        request_id,
+
+        team,
+
+        message,
+
+        priority,
+
+        action
+    )
+
+    db.close()
+
+    reply = f"""
+CommuniSync AI
+
+Request:
+{request_id}
+
+Category:
+{category}
+
+Priority:
+{priority}
+
+Assigned Team:
+{team}
+
+Suggested:
+{action}
+
+Request routed.
+"""
+
+    xml = f"""
 <Response>
 <Message>
 {reply}
@@ -236,39 +260,10 @@ Your request has been routed successfully.
 </Response>
 """
 
-        return Response(
-            content=xml,
-            media_type="application/xml"
-        )
+    return Response(
 
-    except Exception:
+        content=xml,
 
-        xml = """
-<Response>
-<Message>
-CommuniSync AI
-
-Something went wrong.
-Please try again.
-</Message>
-</Response>
-"""
-
-        return Response(
-            content=xml,
-            media_type="application/xml"
-        )
-
-
-# -----------------------------------
-# HEALTH CHECK
-# -----------------------------------
-
-@app.get("/")
-
-def home():
-
-    return {
-        "status": "running",
-        "service": "CommuniSync AI"
-    }
+        media_type=
+        "application/xml"
+    )

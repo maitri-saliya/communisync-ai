@@ -1,214 +1,285 @@
 import streamlit as st
-
-from streamlit_autorefresh import st_autorefresh
+import pandas as pd
 
 from database import SessionLocal
 from models import Issue
 
-# -------------------------------------
+
+# ----------------------------------
 # PAGE CONFIG
-# -------------------------------------
+# ----------------------------------
 
 st.set_page_config(
-    page_title="CommuniSync AI",
+    page_title="CommuniSync Dashboard",
     page_icon="🌍",
     layout="wide"
 )
 
-# -------------------------------------
-# AUTO REFRESH
-# -------------------------------------
 
-st_autorefresh(interval=3000, key="refresh")
-
-# -------------------------------------
-# STYLING
-# -------------------------------------
-
-st.markdown("""
-<style>
-
-.block-container {
-    padding-top: 2rem;
-}
-
-.metric-card {
-    background-color: white;
-    padding: 15px;
-    border-radius: 12px;
-}
-
-</style>
-""", unsafe_allow_html=True)
-
-# -------------------------------------
+# ----------------------------------
 # DATABASE
-# -------------------------------------
+# ----------------------------------
 
 db = SessionLocal()
 
+
+# ----------------------------------
+# LOAD DATA
+# ----------------------------------
+
 issues = db.query(Issue).all()
 
-# -------------------------------------
+
+def to_dataframe():
+
+    rows = []
+
+    for i in issues:
+
+        rows.append({
+
+            "ID": i.id,
+
+            "Message": i.message,
+
+            "Category": i.category,
+
+            "Priority": i.priority,
+
+            "Assigned Team": i.assigned_team,
+
+            "Suggested Action": i.suggested_action,
+
+            "Status": i.status
+
+        })
+
+    return pd.DataFrame(rows)
+
+
+df = to_dataframe()
+
+
+# ----------------------------------
 # HEADER
-# -------------------------------------
+# ----------------------------------
 
-st.title("🌍 CommuniSync AI")
+st.title("🌍 CommuniSync Dashboard")
 
-st.subheader(
-    "AI-Powered Hyperlocal Community Coordination Platform"
+st.caption(
+    "AI-Powered Community Coordination"
 )
-
-st.markdown("""
-### Making community help as easy as texting a friend.
-""")
 
 st.divider()
 
-# -------------------------------------
-# METRICS
-# -------------------------------------
 
-col1, col2, col3, col4 = st.columns(4)
+# ----------------------------------
+# METRICS
+# ----------------------------------
+
+total = len(issues)
+
+pending = len([
+    x
+    for x in issues
+    if x.status == "Pending"
+])
+
+resolved = len([
+    x
+    for x in issues
+    if x.status == "Resolved"
+])
+
+col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.metric("Total Issues", len(issues))
+
+    st.metric(
+        "Total Requests",
+        total
+    )
 
 with col2:
 
-    resolved = len([
-        i for i in issues
-        if i.status == "Resolved"
-    ])
-
-    st.metric("Resolved", resolved)
+    st.metric(
+        "Pending",
+        pending
+    )
 
 with col3:
-    st.metric("Avg Response Time", "3 mins")
 
-with col4:
-    st.metric("Community Engagement", "87%")
+    st.metric(
+        "Resolved",
+        resolved
+    )
+
 
 st.divider()
 
-# -------------------------------------
-# LIVE DASHBOARD
-# -------------------------------------
 
-st.header("📊 Live Community Dashboard")
+# ----------------------------------
+# ANALYTICS
+# ----------------------------------
 
-if len(issues) == 0:
+if not df.empty:
 
-    st.info("No active community issues.")
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.subheader(
+            "Request Categories"
+        )
+
+        category_counts = (
+            df["Category"]
+            .value_counts()
+        )
+
+        st.bar_chart(
+            category_counts
+        )
+
+    with col2:
+
+        st.subheader(
+            "Priority Distribution"
+        )
+
+        priority_counts = (
+            df["Priority"]
+            .value_counts()
+        )
+
+        st.bar_chart(
+            priority_counts
+        )
 
 else:
 
-    for issue in reversed(issues):
+    st.info(
+        "No requests yet"
+    )
 
-        st.markdown(f"""
-### 📝 Request #{issue.id}
 
-**Message:**  
+st.divider()
+
+
+# ----------------------------------
+# REQUEST LIST
+# ----------------------------------
+
+st.header(
+    "Community Requests"
+)
+
+
+for issue in reversed(issues):
+
+    title = (
+        f"Request #{issue.id}"
+        f" • {issue.priority}"
+    )
+
+    with st.expander(
+        title
+    ):
+
+        st.markdown(
+            f"""
+**Issue**
+  
 {issue.message}
+"""
+        )
 
-**Category:** {issue.category}
+        st.write(
+            f"Category: {issue.category}"
+        )
 
-**Priority:** {issue.priority}
+        st.write(
+            f"Assigned Team: {issue.assigned_team}"
+        )
 
-**Assigned Team:** {issue.assigned_team}
+        st.write(
+            f"Suggested Action: {issue.suggested_action}"
+        )
 
-**Status:** {issue.status}
-""")
+        new_status = st.selectbox(
 
-        st.divider()
+            "Update Status",
 
-# -------------------------------------
-# IMPACT SECTION
-# -------------------------------------
+            [
 
-st.header("📈 Community Impact")
+                "Pending",
 
-left, right = st.columns(2)
+                "In Progress",
 
-with left:
+                "Resolved"
 
-    st.markdown("""
-### Before CommuniSync AI
+            ],
 
-- Delayed issue reporting
-- Manual routing
-- No visibility
-- Slow response cycles
-- Disconnected communities
-""")
+            index=[
 
-with right:
+                "Pending",
 
-    st.markdown("""
-### After CommuniSync AI
+                "In Progress",
 
-- Instant AI routing
-- Faster issue resolution
-- Real-time tracking
-- Better community engagement
-- Hyperlocal collaboration
-""")
+                "Resolved"
 
-st.divider()
+            ].index(
+                issue.status
+            ),
 
-# -------------------------------------
-# AI SUMMARY
-# -------------------------------------
+            key=f"status_{issue.id}"
+        )
 
-st.header("🧠 AI Community Summary")
+        if new_status != issue.status:
 
-if st.button("Generate Daily AI Summary"):
+            issue.status = (
+                new_status
+            )
 
-    total = len(issues)
+            db.commit()
 
-    resolved_count = len([
-        i for i in issues
-        if i.status == "Resolved"
-    ])
+            st.success(
+                "Updated"
+            )
 
-    pending_count = len([
-        i for i in issues
-        if i.status == "Pending"
-    ])
-
-    st.success(f"""
-Today, CommuniSync AI processed {total} community requests.
-
-✅ {resolved_count} issues resolved
-⏳ {pending_count} issues pending
-
-AI-powered routing improved community response efficiency.
-""")
-
-# -------------------------------------
-# RESPONSIBLE AI
-# -------------------------------------
 
 st.divider()
 
-st.header("🔒 Responsible AI & Privacy")
 
-st.markdown("""
-- No personal data selling
-- Privacy-aware routing
-- Human-controlled issue resolution
-- AI used for assistance only
-- Mock/synthetic data for prototype
-""")
+# ----------------------------------
+# TABLE
+# ----------------------------------
 
-# -------------------------------------
+st.subheader(
+    "Full Issue Table"
+)
+
+if not df.empty:
+
+    st.dataframe(
+        df,
+
+        use_container_width=True
+    )
+
+
+# ----------------------------------
 # FOOTER
-# -------------------------------------
+# ----------------------------------
 
 st.divider()
 
-st.caption("""
-CommuniSync AI • Smart Communities Through Human-Centered AI
-""")
+st.caption(
+"""
+CommuniSync
+
+Making getting help as easy as texting a friend.
+"""
+)
 
 db.close()
