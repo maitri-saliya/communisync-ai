@@ -13,42 +13,66 @@ app = FastAPI()
 # AI CLASSIFICATION
 # ----------------------------------------
 
+# def classify_issue(message):
+
+#     prompt = f"""
+#     Analyze this community issue.
+
+#     Return ONLY in this format:
+
+#     Category: ...
+#     Priority: ...
+#     Assigned Team: ...
+
+#     Message:
+#     {message}
+#     """
+
+#     try:
+
+#         response = requests.post(
+#             "http://localhost:11434/api/generate",
+#             json={
+#                 "model": "mistral",
+#                 "prompt": prompt,
+#                 "stream": False
+#             }
+#         )
+
+#         result = response.json()["response"]
+
+#         return result
+
+#     except:
+
+#         return """
+# Category: Maintenance
+# Priority: Medium
+# Assigned Team: Civic Support Team
+# """
+
 def classify_issue(message):
 
-    prompt = f"""
-    Analyze this community issue.
+    msg = message.lower()
 
-    Return ONLY in this format:
+    if "water" in msg:
+        return """
+Category: Emergency
+Priority: High
+Assigned Team: Utility Team
+"""
 
-    Category: ...
-    Priority: ...
-    Assigned Team: ...
-
-    Message:
-    {message}
-    """
-
-    try:
-
-        response = requests.post(
-            "http://localhost:11434/api/generate",
-            json={
-                "model": "mistral",
-                "prompt": prompt,
-                "stream": False
-            }
-        )
-
-        result = response.json()["response"]
-
-        return result
-
-    except:
-
+    elif "light" in msg:
         return """
 Category: Maintenance
 Priority: Medium
-Assigned Team: Civic Support Team
+Assigned Team: Civic Team
+"""
+
+    return """
+Category: General
+Priority: Low
+Assigned Team: Community Team
 """
 
 
