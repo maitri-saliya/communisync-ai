@@ -1,19 +1,42 @@
 #!/bin/bash
 
-echo "Starting Ollama..."
-ollama serve &
+echo ""
+echo "🚀 Starting CommuniSync..."
+echo ""
 
-sleep 5
+# Start Ollama if not already running
+if ! pgrep -f "ollama serve" > /dev/null
+then
+    echo "🧠 Starting Ollama..."
 
-echo "Starting FastAPI..."
-uvicorn server:app --reload &
+    nohup ollama serve \
+    > ollama.log 2>&1 &
 
-sleep 3
+    sleep 5
+else
+    echo "🧠 Ollama already running"
+fi
 
-echo "Starting Streamlit..."
-streamlit run app.py &
 
-sleep 3
+# Start Streamlit
+if ! pgrep -f "streamlit run app.py" > /dev/null
+then
+    echo "🌍 Starting Dashboard..."
 
-echo "Starting ngrok..."
-ngrok http 8000
+    nohup streamlit run app.py \
+    > dashboard.log 2>&1 &
+
+    sleep 3
+else
+    echo "🌍 Dashboard already running"
+fi
+
+
+echo ""
+echo "✅ CommuniSync Started"
+echo ""
+
+echo "Dashboard:"
+echo "http://localhost:8501"
+
+echo ""

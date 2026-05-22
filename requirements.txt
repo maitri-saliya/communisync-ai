@@ -1,7 +1,6 @@
-fastapi
-uvicorn
+streamlit
 sqlalchemy
 requests
 twilio
-python-multipart
-openai
+python-dotenv
+pandas
