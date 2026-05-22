@@ -1,28 +1,61 @@
 import requests
-import json
+
 
 def classify_issue(message):
 
-    prompt = f'''
-    Categorize this community issue.
+    prompt = f"""
+Analyze community request.
 
-    Message: {message}
+Return ONLY:
 
-    Return:
-    Category
-    Priority
-    Assigned Team
-    '''
+Category:
+Priority:
+Assigned Team:
+Suggested Action:
 
-    response = requests.post(
-        "http://localhost:11434/api/generate",
-        json={
-            "model": "mistral",
-            "prompt": prompt,
-            "stream": False
-        }
-    )
+Request:
+{message}
 
-    result = response.json()["response"]
+Rules:
 
-    return result
+- Streetlight → Maintenance Team
+- Roads → Maintenance Team
+- Water / Pool / Garbage → Utility Team
+- Broken equipment → Repair Team
+- Events / Food / Health → Community Team
+"""
+
+    try:
+
+        response = requests.post(
+
+            "http://localhost:11434/api/generate",
+
+            json={
+
+                "model":
+                "mistral",
+
+                "prompt":
+                prompt,
+
+                "stream":
+                False
+            },
+
+            timeout=60
+        )
+
+        return (
+            response
+            .json()["response"]
+        )
+
+    except:
+
+        return """
+Category: General
+Priority: Medium
+Assigned Team: Community Team
+Suggested Action: Manual review
+"""
