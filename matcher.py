@@ -1,4 +1,6 @@
 from database import *
+from teams import TEAM_NUMBERS
+
 
 def find_match(data):
 
@@ -13,19 +15,43 @@ def find_match(data):
     match=(
         session.query(Need)
         .filter(
-            Need.category==data["category"],
-            Need.type==opposite
+            Need.category==
+            data["category"],
+
+            Need.type==
+            opposite
         )
         .first()
     )
 
     if match:
+
         return (
             True,
-            f"Matched nearby resource."
+            f"""
+Matched!
+
+Resource:
+{match.user}
+
+Contact:
+{match.contact}
+
+Approx distance:
+1.5 km
+"""
         )
+
+    fallback=TEAM_NUMBERS.get(
+        data["category"]
+    )
 
     return (
         False,
-        "No match yet. Added to queue."
+        f"""
+No direct match.
+
+Forwarded to:
+{fallback}
+"""
     )
