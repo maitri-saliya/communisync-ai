@@ -1,6 +1,8 @@
 from database import *
 from teams import TEAM_NUMBERS
-
+from notification_service import (
+    send_assignment
+)
 
 DEFAULT_TEAM = TEAM_NUMBERS["general"]
 
@@ -18,33 +20,57 @@ def find_match(data):
     match = (
         session.query(Need)
         .filter(
-            Need.category == data["category"],
-            Need.type == opposite
+            Need.category ==
+            data["category"],
+
+            Need.type ==
+            opposite
         )
         .first()
     )
 
     if match:
 
+        send_assignment(
+            to_number=match.contact,
+            requester=data["requester"],
+            category=data["category"],
+            description=data[
+                "short_description"
+            ],
+            urgency=data["urgency"],
+            is_match=True
+        )
+
         return (
             True,
             f"""
 Matched!
 
-Resource:
-{match.user}
+Request forwarded.
 
 Contact:
 {match.contact}
 
-Approx distance:
+Distance:
 1.5 km
 """
         )
 
-    redirected_team = TEAM_NUMBERS.get(
+    redirected = TEAM_NUMBERS.get(
         data["category"],
         DEFAULT_TEAM
+    )
+
+    send_assignment(
+        to_number=redirected,
+        requester=data["requester"],
+        category=data["category"],
+        description=data[
+            "short_description"
+        ],
+        urgency=data["urgency"],
+        is_match=False
     )
 
     return (
@@ -52,9 +78,9 @@ Approx distance:
         f"""
 No direct match.
 
-Your request has been routed to Community Support.
+Forwarded to support.
 
 Contact:
-{redirected_team}
+{redirected}
 """
     )

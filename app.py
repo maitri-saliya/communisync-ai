@@ -11,46 +11,145 @@ app = FastAPI()
 
 @app.get("/")
 def health():
-    return {"status": "running"}
+
+    return {
+        "status": "CommuniSync running"
+    }
 
 
 @app.post("/webhook")
 async def webhook(
-    Body: str = Form(...)
+
+    Body: str = Form(...),
+
+    From: str = Form(...)
+
 ):
 
-    result = understand(Body)
+    try:
 
-    session = Session()
+        # --------------------
+        # AI Extraction
+        # --------------------
 
-    row = Need(
-        user="demo",
-        category=result["category"],
-        type=result["type"],
-        urgency=result["urgency"],
-        description=result["short_description"]
-    )
+        result = understand(Body)
 
-    session.add(row)
-    session.commit()
+        result["requester"] = From
 
-    matched, msg = find_match(result)
+        category = result.get(
+            "category",
+            "general"
+        )
 
-    response = MessagingResponse()
+        request_type = result.get(
+            "type",
+            "need"
+        )
 
-    response.message(
-        f"""
+        urgency = result.get(
+            "urgency",
+            3
+        )
+
+        description = result.get(
+            "short_description",
+            Body
+        )
+
+        # --------------------
+        # Save request
+        # --------------------
+
+        session = Session()
+
+        row = Need(
+
+            user=From,
+
+            contact=From,
+
+            category=category,
+
+            type=request_type,
+
+            urgency=urgency,
+
+            description=description
+        )
+
+        session.add(row)
+
+        session.commit()
+
+        # --------------------
+        # Match + Notify
+        # --------------------
+
+        matched, message = find_match(
+            {
+                "requester": From,
+
+                "type": request_type,
+
+                "category": category,
+
+                "urgency": urgency,
+
+                "short_description":
+                description
+            }
+        )
+
+        # --------------------
+        # WhatsApp Reply
+        # --------------------
+
+        response = MessagingResponse()
+
+        response.message(
+f"""
+🤝 CommuniSync AI
+
+Request received.
+
+Type:
+{request_type}
+
+Category:
+{category}
+
+Urgency:
+{urgency}/5
+
+Details:
+{description}
+
+{message}
+"""
+        )
+
+        return Response(
+            content=str(response),
+            media_type="application/xml"
+        )
+
+    except Exception as e:
+
+        print("ERROR:", e)
+
+        response = MessagingResponse()
+
+        response.message(
+"""
 CommuniSync AI
 
-Type: {result["type"]}
-Category: {result["category"]}
-Urgency: {result["urgency"]}
+We received your request.
 
-{msg}
+Support team has been notified.
 """
-    )
+        )
 
-    return Response(
-        content=str(response),
-        media_type="application/xml"
-    )
+        return Response(
+            content=str(response),
+            media_type="application/xml"
+        )
