@@ -1,5 +1,4 @@
-from fastapi import FastAPI
-from fastapi import Request
+from fastapi import FastAPI, Request
 from fastapi.responses import Response
 
 from database import SessionLocal
@@ -7,22 +6,41 @@ from models import Issue
 
 from twilio.rest import Client
 
-from openai import OpenAI
+from openai import AzureOpenAI
 
 from teams import TEAM_NUMBERS
 
 import os
 
 
+# ----------------------------------
+# APP
+# ----------------------------------
+
 app = FastAPI()
 
 
-client = OpenAI(
+# ----------------------------------
+# AZURE OPENAI
+# ----------------------------------
+
+client = AzureOpenAI(
+
     api_key=os.getenv(
-        "OPENAI_API_KEY"
+        "AZURE_OPENAI_API_KEY"
+    ),
+
+    api_version="2024-10-21",
+
+    azure_endpoint=os.getenv(
+        "AZURE_OPENAI_ENDPOINT"
     )
 )
 
+
+# ----------------------------------
+# TWILIO
+# ----------------------------------
 
 twilio = Client(
 
@@ -36,47 +54,97 @@ twilio = Client(
 )
 
 
+# ----------------------------------
+# AI CLASSIFICATION
+# ----------------------------------
+
 def classify_issue(message):
 
-    prompt = f"""
-Analyze request.
+    try:
 
-Return ONLY:
+        result = (
+            client
+            .chat
+            .completions
+            .create(
 
-Category:
-Priority:
-Assigned Team:
-Suggested Action:
+                model=os.getenv(
+                    "AZURE_OPENAI_DEPLOYMENT"
+                ),
 
-Request:
-{message}
+                messages=[
+
+                    {
+                        "role": "system",
+
+                        "content": """
+You are CommuniSync AI.
+
+Analyze community requests.
+
+Return EXACTLY:
+
+Category: <value>
+Priority: <Low/Medium/High>
+Assigned Team: <value>
+Suggested Action: <value>
+
+No explanation.
+"""
+                    },
+
+                    {
+                        "role": "user",
+
+                        "content": message
+                    }
+
+                ],
+
+                temperature=0
+            )
+        )
+
+        content = (
+            result
+            .choices[0]
+            .message
+            .content
+        )
+
+        if not content:
+
+            return """
+Category: Unknown
+Priority: Medium
+Assigned Team: General
+Suggested Action: Manual review
 """
 
-    result = client.chat.completions.create(
+        return content
 
-        model="gpt-4o-mini",
+    except Exception as e:
 
-        messages=[
+        print(
+            f"Azure Error: {e}"
+        )
 
-            {
-                "role":
-                "system",
-
-                "content":
-                prompt
-            }
-        ]
-    )
-
-    return (
-        result
-        .choices[0]
-        .message
-        .content
-    )
+        return """
+Category: Unknown
+Priority: Medium
+Assigned Team: General
+Suggested Action: Manual review
+"""
 
 
-def extract(text, field):
+# ----------------------------------
+# PARSE RESPONSE
+# ----------------------------------
+
+def extract(
+    text,
+    field
+):
 
     for line in text.splitlines():
 
@@ -85,25 +153,28 @@ def extract(text, field):
         ):
 
             return (
+
                 line
                 .split(":", 1)[1]
                 .strip()
+
             )
 
     return "Unknown"
 
 
+# ----------------------------------
+# SEND WHATSAPP ALERT
+# ----------------------------------
+
 def notify_team(
 
     request_id,
-
     team,
-
     issue,
-
     priority,
-
     action
+
 ):
 
     phone = TEAM_NUMBERS.get(
@@ -111,6 +182,11 @@ def notify_team(
     )
 
     if not phone:
+
+        print(
+            f"No number configured for {team}"
+        )
+
         return
 
     text = f"""
@@ -129,109 +205,152 @@ Suggested Action:
 {action}
 """
 
-    twilio.messages.create(
+    try:
 
-        from_=os.getenv(
-            "TWILIO_WHATSAPP_NUMBER"
-        ),
+        twilio.messages.create(
 
-        to=phone,
+            from_=os.getenv(
+                "TWILIO_WHATSAPP_NUMBER"
+            ),
 
-        body=text
-    )
+            to=phone,
 
+            body=text
+        )
+
+    except Exception as e:
+
+        print(
+            f"Twilio Error: {e}"
+        )
+
+
+# ----------------------------------
+# WHATSAPP WEBHOOK
+# ----------------------------------
 
 @app.post(
     "/whatsapp"
 )
 
 async def whatsapp(
+
     request: Request
+
 ):
 
-    form = await request.form()
+    db = None
 
-    message = (
-        form
-        .get(
-            "Body",
-            ""
+    try:
+
+        form = (
+            await request.form()
         )
-    )
 
-    result = (
-        classify_issue(
-            message
+        message = (
+
+            form.get(
+                "Body",
+                ""
+            )
+            .strip()
+
         )
-    )
 
-    category = extract(
-        result,
-        "Category"
-    )
+        if not message:
 
-    priority = extract(
-        result,
-        "Priority"
-    )
+            return Response(
 
-    team = extract(
-        result,
-        "Assigned Team"
-    )
+                content="""
+<Response>
+<Message>
+Please send a request.
+</Message>
+</Response>
+""",
 
-    action = extract(
-        result,
-        "Suggested Action"
-    )
+                media_type="application/xml"
+            )
 
-    db = SessionLocal()
+        result = (
+            classify_issue(
+                message
+            )
+        )
 
-    issue = Issue(
+        category = (
+            extract(
+                result,
+                "Category"
+            )
+        )
 
-        message=message,
+        priority = (
+            extract(
+                result,
+                "Priority"
+            )
+        )
 
-        category=category,
+        team = (
+            extract(
+                result,
+                "Assigned Team"
+            )
+        )
 
-        priority=priority,
+        action = (
+            extract(
+                result,
+                "Suggested Action"
+            )
+        )
 
-        assigned_team=team,
+        db = SessionLocal()
 
-        suggested_action=action,
+        issue = Issue(
 
-        status="Pending"
-    )
+            message=message,
 
-    db.add(
-        issue
-    )
+            category=category,
 
-    db.commit()
+            priority=priority,
 
-    db.refresh(
-        issue
-    )
+            assigned_team=team,
 
-    request_id = (
-        f"CS-{issue.id}"
-    )
+            suggested_action=action,
 
-    notify_team(
+            status="Pending"
+        )
 
-        request_id,
+        db.add(
+            issue
+        )
 
-        team,
+        db.commit()
 
-        message,
+        db.refresh(
+            issue
+        )
 
-        priority,
+        request_id = (
+            f"CS-{issue.id}"
+        )
 
-        action
-    )
+        notify_team(
 
-    db.close()
+            request_id,
 
-    reply = f"""
+            team,
+
+            message,
+
+            priority,
+
+            action
+        )
+
+        reply = f"""
 CommuniSync AI
 
 Request:
@@ -249,10 +368,10 @@ Assigned Team:
 Suggested:
 {action}
 
-Request routed.
+Request routed successfully.
 """
 
-    xml = f"""
+        xml = f"""
 <Response>
 <Message>
 {reply}
@@ -260,10 +379,35 @@ Request routed.
 </Response>
 """
 
-    return Response(
+        return Response(
 
-        content=xml,
+            content=xml,
 
-        media_type=
-        "application/xml"
-    )
+            media_type="application/xml"
+        )
+
+    except Exception as e:
+
+        print(
+            f"Webhook Error: {e}"
+        )
+
+        return Response(
+
+            content="""
+<Response>
+<Message>
+Something went wrong.
+Please try again.
+</Message>
+</Response>
+""",
+
+            media_type="application/xml"
+        )
+
+    finally:
+
+        if db:
+
+            db.close()
