@@ -19,6 +19,6 @@ TEAM_NUMBERS = {
     "whatsapp:+919845401200",
 
     # DEFAULT CATEGORY
-    "General Team":
+    "general":
     "whatsapp:+918369366339"
 }
