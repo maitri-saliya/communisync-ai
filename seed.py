@@ -1,49 +1,51 @@
-from database import *
+from database import Session, Need
 
-session=Session()
+s = Session()
 
-demo_data=[
+s.query(Need).delete()
 
-Need(
-user="Elderly Couple",
-contact="whatsapp:+919845401200",
-category="food",
-type="need",
-urgency=5,
-description="Need dinner"
-),
+demo = [
 
 Need(
-user="Volunteer",
-contact="whatsapp:+918082094901",
-category="transport",
-type="offer",
-urgency=2,
-description="Can deliver"
-),
-
-Need(
-user="Student",
-contact="whatsapp:+918555870631",
-category="repair",
-type="need",
-urgency=3,
-description="Need appliance repair"
-),
-
-Need(
-user="Neighbour",
+user="Food Volunteer",
 contact="whatsapp:+918369366339",
 category="food",
 type="offer",
 urgency=1,
-description="Extra meals"
+description="Meals available"
+),
+
+Need(
+user="Repair Volunteer",
+contact="whatsapp:+918555870631",
+category="repair",
+type="offer",
+urgency=1,
+description="Repair support"
+),
+
+Need(
+user="Transport Volunteer",
+contact="whatsapp:+917411395906",
+category="transport",
+type="offer",
+urgency=1,
+description="Delivery help"
+),
+
+Need(
+user="Community Team",
+contact="whatsapp:+919845401200",
+category="general",
+type="offer",
+urgency=1,
+description="General support"
 )
 
 ]
 
-session.add_all(demo_data)
+s.add_all(demo)
 
-session.commit()
+s.commit()
 
-print("Seeded")
+print("Demo data inserted")

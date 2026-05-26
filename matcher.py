@@ -1,8 +1,7 @@
-from database import *
+from database import Session, Need
 from teams import TEAM_NUMBERS
-from notification_service import (
-    send_assignment
-)
+from notification_service import send_assignment
+
 
 DEFAULT_TEAM = TEAM_NUMBERS["general"]
 
@@ -11,30 +10,51 @@ def find_match(data):
 
     session = Session()
 
+    category = (
+        data.get("category")
+        or "general"
+    ).lower()
+
+    request_type = (
+        data.get("type")
+        or "need"
+    ).lower()
+
+    requester = data.get(
+        "requester",
+        "Anonymous"
+    )
+
     opposite = (
         "offer"
-        if data["type"] == "need"
+        if request_type == "need"
         else "need"
     )
 
-    match = (
+    records = (
         session.query(Need)
         .filter(
-            Need.category ==
-            data["category"],
+            Need.category.ilike(
+                category
+            ),
 
-            Need.type ==
-            opposite
+            Need.type.ilike(
+                opposite
+            ),
+
+            Need.contact != requester
         )
-        .first()
+        .all()
     )
 
-    if match:
+    if records:
+
+        match = records[0]
 
         send_assignment(
             to_number=match.contact,
-            requester=data["requester"],
-            category=data["category"],
+            requester=requester,
+            category=category,
             description=data[
                 "short_description"
             ],
@@ -45,27 +65,25 @@ def find_match(data):
         return (
             True,
             f"""
-Matched!
+Matched successfully.
 
-Request forwarded.
+Assigned:
+{match.user}
 
 Contact:
 {match.contact}
-
-Distance:
-1.5 km
 """
         )
 
     redirected = TEAM_NUMBERS.get(
-        data["category"],
+        category,
         DEFAULT_TEAM
     )
 
     send_assignment(
         to_number=redirected,
-        requester=data["requester"],
-        category=data["category"],
+        requester=requester,
+        category=category,
         description=data[
             "short_description"
         ],
@@ -78,9 +96,7 @@ Distance:
         f"""
 No direct match.
 
-Forwarded to support.
-
-Contact:
+Forwarded to:
 {redirected}
 """
     )
