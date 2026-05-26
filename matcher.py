@@ -2,24 +2,24 @@ from database import *
 from teams import TEAM_NUMBERS
 
 
+DEFAULT_TEAM = TEAM_NUMBERS["general"]
+
+
 def find_match(data):
 
-    session=Session()
+    session = Session()
 
-    opposite=(
+    opposite = (
         "offer"
-        if data["type"]=="need"
+        if data["type"] == "need"
         else "need"
     )
 
-    match=(
+    match = (
         session.query(Need)
         .filter(
-            Need.category==
-            data["category"],
-
-            Need.type==
-            opposite
+            Need.category == data["category"],
+            Need.type == opposite
         )
         .first()
     )
@@ -42,8 +42,9 @@ Approx distance:
 """
         )
 
-    fallback=TEAM_NUMBERS.get(
-        data["category"]
+    redirected_team = TEAM_NUMBERS.get(
+        data["category"],
+        DEFAULT_TEAM
     )
 
     return (
@@ -51,7 +52,9 @@ Approx distance:
         f"""
 No direct match.
 
-Forwarded to:
-{fallback}
+Your request has been routed to Community Support.
+
+Contact:
+{redirected_team}
 """
     )

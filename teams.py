@@ -1,20 +1,24 @@
-TEAM_NUMBERS={
+TEAM_NUMBERS = {
 
-"food":
-"whatsapp:+919845401200",
+    "food":
+    "whatsapp:+919845401200",
 
-"transport":
-"whatsapp:+918082094901",
+    "repair":
+    "whatsapp:+918555870631",
 
-"utility":
-"whatsapp:+917411395906",
+    "transport":
+    "whatsapp:+918082094901",
 
-"civic":
-"whatsapp:+918369366339",
+    "utility":
+    "whatsapp:+918082094901",
 
-"community":
-"whatsapp:+919845401200",
+    "civic":
+    "whatsapp:+918369366339",
 
-"repair":
-"whatsapp:+918555870631"
+    "community":
+    "whatsapp:+919845401200",
+
+    # DEFAULT CATEGORY
+    "general":
+    "whatsapp:+918369366339"
 }
