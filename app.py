@@ -1,22 +1,29 @@
 from fastapi import FastAPI, Form
+from fastapi.responses import Response
 from twilio.twiml.messaging_response import MessagingResponse
 
-from database import *
-from ai_service import *
-from matcher import *
+from database import Session, Need
+from ai_service import understand
+from matcher import find_match
 
-app=FastAPI()
+app = FastAPI()
+
+
+@app.get("/")
+def health():
+    return {"status": "running"}
+
 
 @app.post("/webhook")
 async def webhook(
-    Body:str=Form(...)
+    Body: str = Form(...)
 ):
 
-    result=understand(Body)
+    result = understand(Body)
 
-    session=Session()
+    session = Session()
 
-    row=Need(
+    row = Need(
         user="demo",
         category=result["category"],
         type=result["type"],
@@ -25,28 +32,25 @@ async def webhook(
     )
 
     session.add(row)
-
     session.commit()
 
-    matched,msg=find_match(result)
+    matched, msg = find_match(result)
 
-    tw=MessagingResponse()
+    response = MessagingResponse()
 
-    tw.message(
-f"""
+    response.message(
+        f"""
 CommuniSync AI
 
-Type:
-{result["type"]}
-
-Category:
-{result["category"]}
-
-Urgency:
-{result["urgency"]}
+Type: {result["type"]}
+Category: {result["category"]}
+Urgency: {result["urgency"]}
 
 {msg}
 """
-)
+    )
 
-    return str(tw)
+    return Response(
+        content=str(response),
+        media_type="application/xml"
+    )
