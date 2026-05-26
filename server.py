@@ -411,3 +411,9 @@ Please try again.
         if db:
 
             db.close()
+
+print(
+    os.getenv(
+        "DATABASE_URL"
+    )
+)

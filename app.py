@@ -1,5 +1,8 @@
+import os
+
 import streamlit as st
 import pandas as pd
+import time
 
 from database import SessionLocal
 from models import Issue
@@ -15,19 +18,34 @@ st.set_page_config(
     layout="wide"
 )
 
+st.button(
+    "Refresh Dashboard"
+)
 
-# ----------------------------------
-# DATABASE
-# ----------------------------------
-
-db = SessionLocal()
+if st.button("Refresh Dashboard"):
+    st.rerun()
 
 
 # ----------------------------------
 # LOAD DATA
 # ----------------------------------
 
-issues = db.query(Issue).all()
+def load_issues():
+
+    db = SessionLocal()
+
+    try:
+
+        return db.query(
+            Issue
+        ).all()
+
+    finally:
+
+        db.close()
+
+
+issues = load_issues()
 
 
 def to_dataframe():
@@ -283,3 +301,9 @@ Making getting help as easy as texting a friend.
 )
 
 db.close()
+
+print(
+    os.getenv(
+        "DATABASE_URL"
+    )
+)
