@@ -1,24 +1,24 @@
 TEAM_NUMBERS = {
 
-    "food":
+    "Food Team":
     "whatsapp:+919845401200",
 
-    "repair":
+    "Repair Team":
     "whatsapp:+918555870631",
 
-    "transport":
+    "Transport Team":
     "whatsapp:+917411395906",
 
-    "utility":
+    "Utility Team":
     "whatsapp:+918082094901",
 
-    "civic":
+    "Civic Team":
     "whatsapp:+918369366339",
 
-    "community":
+    "Community Team":
     "whatsapp:+919845401200",
 
     # DEFAULT CATEGORY
-    "general":
+    "General Team":
     "whatsapp:+918369366339"
 }

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>CommuniSync Dashboard</title>
+
+<style>
+
+body{
+font-family:Arial;
+padding:30px;
+background:#f4f4f4;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:12px;
+margin-bottom:20px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+}
+
+th,td{
+padding:12px;
+border-bottom:1px solid #ddd;
+}
+
+h1{
+color:#1976d2;
+}
+
+.refresh{
+padding:10px;
+background:#1976d2;
+color:white;
+border:none;
+cursor:pointer;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>🤝 CommuniSync Dashboard</h1>
+
+<div class="card">
+
+<h2>
+Total Requests:
+{{ total }}
+</h2>
+
+<button
+onclick="location.reload()"
+class="refresh">
+
+Refresh
+
+</button>
+
+</div>
+
+<div class="card">
+
+<table>
+
+<tr>
+
+<th>User</th>
+<th>Category</th>
+<th>Type</th>
+<th>Urgency</th>
+<th>Description</th>
+
+</tr>
+
+{% for row in rows %}
+
+<tr>
+
+<td>{{row.user}}</td>
+
+<td>{{row.category}}</td>
+
+<td>{{row.type}}</td>
+
+<td>{{row.urgency}}</td>
+
+<td>{{row.description}}</td>
+
+</tr>
+
+{% endfor %}
+
+</table>
+
+</div>
+
+</body>
+
+</html>

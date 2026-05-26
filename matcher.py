@@ -76,8 +76,14 @@ Contact:
         )
 
     redirected = TEAM_NUMBERS.get(
-        category,
-        DEFAULT_TEAM
+
+        data.get(
+            "team"
+        ),
+
+        TEAM_NUMBERS[
+            "Community Team"
+        ]
     )
 
     send_assignment(

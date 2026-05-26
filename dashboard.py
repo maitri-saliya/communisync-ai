@@ -1,17 +1,48 @@
 from fastapi import APIRouter
-from database import *
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 
-router=APIRouter()
+from database import Session
+from database import Need
+
+
+router = APIRouter()
+
+templates = (
+    Jinja2Templates(
+        directory="templates"
+    )
+)
+
 
 @router.get("/dashboard")
-def dashboard():
+def dashboard(
+    request: Request
+):
 
-    s=Session()
+    session = Session()
 
-    total=s.query(Need).count()
+    rows = (
+        session
+        .query(Need)
+        .order_by(
+            Need.id.desc()
+        )
+        .all()
+    )
 
-    return {
-        "requests":total,
-        "estimated_hours_saved":
-        total*0.5
-    }
+    return templates.TemplateResponse(
+
+        "dashboard.html",
+
+        {
+            "request":
+            request,
+
+            "rows":
+            rows,
+
+            "total":
+            len(rows)
+        }
+    )

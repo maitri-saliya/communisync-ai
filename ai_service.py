@@ -3,115 +3,143 @@ import json
 from openai import AzureOpenAI
 
 
-CATEGORIES = {
-    "food": [
-        "food",
-        "meal",
-        "hungry",
-        "dinner",
-        "lunch"
-    ],
-    "repair": [
-        "repair",
-        "electrician",
-        "fix",
-        "appliance"
-    ],
-    "transport": [
-        "transport",
-        "delivery",
-        "ride",
-        "groceries"
-    ],
-    "community": [
-        "volunteer",
-        "help",
-        "support"
-    ]
+client = AzureOpenAI(
+    api_key=os.getenv(
+        "AZURE_OPENAI_KEY"
+    ),
+    api_version=
+    "2024-08-01-preview",
+    azure_endpoint=
+    os.getenv(
+        "AZURE_OPENAI_ENDPOINT"
+    )
+)
+
+
+TEAM_MAP = {
+
+    "utility":
+    "Utility Team",
+
+    "civic":
+    "Civic Team",
+
+    "community":
+    "Community Team",
+
+    "repair":
+    "Repair Team"
 }
-
-
-def detect_category(text):
-
-    text = text.lower()
-
-    for category, words in CATEGORIES.items():
-
-        if any(
-            word in text
-            for word in words
-        ):
-            return category
-
-    return "community"
 
 
 def understand(text):
 
     try:
 
-        client = AzureOpenAI(
-            api_key=os.getenv(
-                "AZURE_OPENAI_KEY"
-            ),
-            api_version="2024-08-01-preview",
-            azure_endpoint=os.getenv(
-                "AZURE_OPENAI_ENDPOINT"
-            )
-        )
-
         response = (
             client.chat.completions.create(
-                model=os.getenv(
+
+                model=
+                os.getenv(
                     "AZURE_OPENAI_DEPLOYMENT"
                 ),
-                messages=[
-                    {
-                        "role":"system",
-                        "content":"""
-Return JSON:
-
-{
-"type":"",
-"category":"",
-"urgency":1,
-"short_description":""
-}
-"""
-                    },
-                    {
-                        "role":"user",
-                        "content":text
-                    }
-                ],
 
                 response_format={
-                    "type":"json_object"
-                }
+                    "type":
+                    "json_object"
+                },
+
+                messages=[
+
+                    {
+                        "role":
+                        "system",
+
+                        "content":
+"""
+You are CommuniSync AI.
+
+Extract JSON only.
+
+{
+"type":"need|offer",
+
+"category":"single word",
+
+"urgency":1-5,
+
+"short_description":"",
+
+"team":"Utility Team | Civic Team | Community Team | Repair Team"
+}
+
+Rules:
+
+food → Community Team
+
+repair →
+Repair Team
+
+electricity →
+Utility Team
+
+road/public →
+Civic Team
+
+unknown →
+Community Team
+"""
+                    },
+
+                    {
+                        "role":
+                        "user",
+
+                        "content":
+                        text
+                    }
+                ]
             )
         )
 
-        return json.loads(
+        result = json.loads(
             response
             .choices[0]
-            .message.content
+            .message
+            .content
         )
 
-    except Exception:
+        if (
+            not result.get(
+                "team"
+            )
+        ):
+            result[
+                "team"
+            ] = (
+                "Community Team"
+            )
+
+        return result
+
+    except Exception as e:
+
+        print(e)
 
         return {
+
             "type":
-            (
-                "offer"
-                if "have" in text.lower()
-                else "need"
-            ),
+            "need",
 
             "category":
-            detect_category(text),
+            "general",
 
-            "urgency":3,
+            "urgency":
+            3,
 
             "short_description":
-            text
+            text,
+
+            "team":
+            "Community Team"
         }

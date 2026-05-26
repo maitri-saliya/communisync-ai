@@ -6,8 +6,66 @@ from database import Session, Need
 from ai_service import understand
 from matcher import find_match
 
+from dashboard import router as dashboard_router
+
 app = FastAPI()
 
+app.include_router(
+    dashboard_router
+)
+
+@app.on_event(
+"startup"
+)
+
+def seed():
+
+    session=Session()
+
+    if (
+        session
+        .query(Need)
+        .count()
+        ==0
+    ):
+
+        session.add_all([
+
+Need(
+user="Food Volunteer",
+
+contact=
+"whatsapp:+918369366339",
+
+category="food",
+
+type="offer",
+
+urgency=1,
+
+description=
+"Meals available"
+),
+
+Need(
+user="Community Team",
+
+contact=
+"whatsapp:+919845401200",
+
+category="general",
+
+type="offer",
+
+urgency=1,
+
+description=
+"General support"
+)
+
+])
+
+        session.commit()
 
 @app.get("/")
 def health():
@@ -87,17 +145,27 @@ async def webhook(
 
         matched, message = find_match(
             {
-                "requester": From,
+                "requester":
+                From,
 
-                "type": request_type,
+                "type":
+                request_type,
 
-                "category": category,
+                "category":
+                category,
 
-                "urgency": urgency,
+                "urgency":
+                urgency,
+
+                "team":
+                result.get(
+                "team"
+                ),
 
                 "short_description":
                 description
             }
+
         )
 
         # --------------------
