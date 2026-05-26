@@ -2,7 +2,6 @@ import os
 
 import streamlit as st
 import pandas as pd
-import time
 
 from database import SessionLocal
 from models import Issue
@@ -13,16 +12,27 @@ from models import Issue
 # ----------------------------------
 
 st.set_page_config(
+
     page_title="CommuniSync Dashboard",
+
     page_icon="🌍",
+
     layout="wide"
 )
 
-st.button(
-    "Refresh Dashboard"
-)
 
-if st.button("Refresh Dashboard"):
+# ----------------------------------
+# REFRESH
+# ----------------------------------
+
+if st.button(
+
+    "🔄 Refresh Dashboard",
+
+    key="dashboard_refresh"
+
+):
+
     st.rerun()
 
 
@@ -36,9 +46,16 @@ def load_issues():
 
     try:
 
-        return db.query(
-            Issue
-        ).all()
+        return (
+
+            db
+            .query(Issue)
+            .order_by(
+                Issue.id.desc()
+            )
+            .all()
+
+        )
 
     finally:
 
@@ -48,11 +65,11 @@ def load_issues():
 issues = load_issues()
 
 
-def to_dataframe():
+def to_dataframe(data):
 
     rows = []
 
-    for i in issues:
+    for i in data:
 
         rows.append({
 
@@ -75,14 +92,18 @@ def to_dataframe():
     return pd.DataFrame(rows)
 
 
-df = to_dataframe()
+df = to_dataframe(
+    issues
+)
 
 
 # ----------------------------------
 # HEADER
 # ----------------------------------
 
-st.title("🌍 CommuniSync Dashboard")
+st.title(
+    "🌍 CommuniSync Dashboard"
+)
 
 st.caption(
     "AI-Powered Community Coordination"
@@ -95,40 +116,60 @@ st.divider()
 # METRICS
 # ----------------------------------
 
-total = len(issues)
+total = len(
+    issues
+)
 
 pending = len([
+
     x
+
     for x in issues
+
     if x.status == "Pending"
+
 ])
 
 resolved = len([
+
     x
+
     for x in issues
+
     if x.status == "Resolved"
+
 ])
 
+
 col1, col2, col3 = st.columns(3)
+
 
 with col1:
 
     st.metric(
+
         "Total Requests",
+
         total
     )
+
 
 with col2:
 
     st.metric(
+
         "Pending",
+
         pending
     )
+
 
 with col3:
 
     st.metric(
+
         "Resolved",
+
         resolved
     )
 
@@ -150,13 +191,11 @@ if not df.empty:
             "Request Categories"
         )
 
-        category_counts = (
+        st.bar_chart(
+
             df["Category"]
             .value_counts()
-        )
 
-        st.bar_chart(
-            category_counts
         )
 
     with col2:
@@ -165,13 +204,11 @@ if not df.empty:
             "Priority Distribution"
         )
 
-        priority_counts = (
+        st.bar_chart(
+
             df["Priority"]
             .value_counts()
-        )
 
-        st.bar_chart(
-            priority_counts
         )
 
 else:
@@ -185,7 +222,7 @@ st.divider()
 
 
 # ----------------------------------
-# REQUEST LIST
+# REQUESTS
 # ----------------------------------
 
 st.header(
@@ -193,38 +230,42 @@ st.header(
 )
 
 
-for issue in reversed(issues):
-
-    title = (
-        f"Request #{issue.id}"
-        f" • {issue.priority}"
-    )
+for issue in issues:
 
     with st.expander(
-        title
+
+        f"Request #{issue.id} • {issue.priority}"
+
     ):
 
         st.markdown(
+
             f"""
 **Issue**
-  
+
 {issue.message}
 """
         )
 
         st.write(
+
             f"Category: {issue.category}"
+
         )
 
         st.write(
+
             f"Assigned Team: {issue.assigned_team}"
+
         )
 
         st.write(
+
             f"Suggested Action: {issue.suggested_action}"
+
         )
 
-        new_status = st.selectbox(
+        status = st.selectbox(
 
             "Update Status",
 
@@ -247,23 +288,45 @@ for issue in reversed(issues):
                 "Resolved"
 
             ].index(
+
                 issue.status
+
             ),
 
             key=f"status_{issue.id}"
+
         )
 
-        if new_status != issue.status:
+        if status != issue.status:
 
-            issue.status = (
-                new_status
-            )
+            db = SessionLocal()
 
-            db.commit()
+            try:
 
-            st.success(
-                "Updated"
-            )
+                row = (
+
+                    db
+                    .query(Issue)
+                    .filter(
+                        Issue.id == issue.id
+                    )
+                    .first()
+
+                )
+
+                row.status = status
+
+                db.commit()
+
+                st.success(
+                    "Updated"
+                )
+
+                st.rerun()
+
+            finally:
+
+                db.close()
 
 
 st.divider()
@@ -280,9 +343,11 @@ st.subheader(
 if not df.empty:
 
     st.dataframe(
+
         df,
 
         use_container_width=True
+
     )
 
 
@@ -293,17 +358,22 @@ if not df.empty:
 st.divider()
 
 st.caption(
+
 """
 CommuniSync
 
 Making getting help as easy as texting a friend.
 """
+
 )
 
-db.close()
 
 print(
+
+    "DATABASE_URL:",
+
     os.getenv(
         "DATABASE_URL"
     )
+
 )
