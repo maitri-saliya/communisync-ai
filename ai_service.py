@@ -1,14 +1,22 @@
 import os
 import json
+
 from openai import AzureOpenAI
 
 
+# ----------------------------------
+# AZURE CLIENT
+# ----------------------------------
+
 client = AzureOpenAI(
+
     api_key=os.getenv(
         "AZURE_OPENAI_KEY"
     ),
+
     api_version=
     "2024-08-01-preview",
+
     azure_endpoint=
     os.getenv(
         "AZURE_OPENAI_ENDPOINT"
@@ -16,21 +24,38 @@ client = AzureOpenAI(
 )
 
 
-TEAM_MAP = {
+# ----------------------------------
+# DEFAULTS
+# ----------------------------------
 
-    "utility":
-    "Utility Team",
+DEFAULT_RESULT = {
 
-    "civic":
-    "Civic Team",
+    "type":
+    "need",
 
-    "community":
+    "category":
+    "general",
+
+    "urgency":
+    3,
+
+    "priority":
+    "Medium",
+
+    "short_description":
+    "",
+
+    "team":
     "Community Team",
 
-    "repair":
-    "Repair Team"
+    "suggested_action":
+    "Manual review"
 }
 
+
+# ----------------------------------
+# AI UNDERSTANDING
+# ----------------------------------
 
 def understand(text):
 
@@ -39,8 +64,7 @@ def understand(text):
         response = (
             client.chat.completions.create(
 
-                model=
-                os.getenv(
+                model=os.getenv(
                     "AZURE_OPENAI_DEPLOYMENT"
                 ),
 
@@ -48,6 +72,8 @@ def understand(text):
                     "type":
                     "json_object"
                 },
+
+                temperature=0,
 
                 messages=[
 
@@ -59,35 +85,64 @@ def understand(text):
 """
 You are CommuniSync AI.
 
-Extract JSON only.
+You classify community issues and requests.
+
+Return ONLY valid JSON.
+
+Schema:
 
 {
-"type":"need|offer",
+    "type":"need|offer",
 
-"category":"single word",
+    "category":"single lowercase word",
 
-"urgency":1-5,
+    "urgency":1-5,
 
-"short_description":"",
+    "priority":"Low|Medium|High",
 
-"team":"Utility Team | Civic Team | Community Team | Repair Team"
+    "short_description":"brief summary",
+
+    "team":"Utility Team|Civic Team|Community Team|Repair Team|Maintenance Team|Neighbor",
+
+    "suggested_action":"short action"
 }
+
+Classification Rules:
+
+- Streetlight problems -> Civic Team
+- Roads / potholes -> Civic Team
+- Garbage / drainage / sewage -> Utility Team
+- Water supply -> Utility Team
+- Electricity -> Utility Team
+- Broken equipment -> Maintenance Team
+- Appliance repair -> Repair Team
+- Borrow / help / assistance -> Neighbor
+- Food / health / donation -> Community Team
+- Community event -> Community Team
+
+Urgency Rules:
+
+5 = emergency / danger / medical
+4 = severe disruption
+3 = standard issue
+2 = minor issue
+1 = suggestion / low importance
+
+Priority Mapping:
+
+urgency 1-2 -> Low
+urgency 3 -> Medium
+urgency 4-5 -> High
 
 Rules:
 
-food → Community Team
-
-repair →
-Repair Team
-
-electricity →
-Utility Team
-
-road/public →
-Civic Team
-
-unknown →
-Community Team
+- Always assign exactly one team.
+- Never return null.
+- Keep category short.
+- Use lowercase category.
+- Keep suggested_action under 10 words.
+- If uncertain use:
+  team = Community Team
 """
                     },
 
@@ -98,48 +153,67 @@ Community Team
                         "content":
                         text
                     }
+
                 ]
             )
         )
 
-        result = json.loads(
+        content = (
             response
             .choices[0]
             .message
             .content
         )
 
-        if (
-            not result.get(
-                "team"
-            )
+        result = json.loads(
+            content
+        )
+
+        # ----------------------------------
+        # SAFETY FALLBACKS
+        # ----------------------------------
+
+        for key, value in DEFAULT_RESULT.items():
+
+            if (
+
+                key not in result
+                or result[key] in [None, ""]
+
+            ):
+
+                result[key] = value
+
+        # Ensure urgency valid
+
+        if not isinstance(
+            result["urgency"],
+            int
         ):
-            result[
-                "team"
-            ] = (
-                "Community Team"
+
+            result["urgency"] = 3
+
+        result["urgency"] = max(
+            1,
+            min(
+                5,
+                result["urgency"]
             )
+        )
 
         return result
 
     except Exception as e:
 
-        print(e)
+        print(
+            "Azure AI Error:",
+            str(e)
+        )
 
-        return {
+        fallback = DEFAULT_RESULT.copy()
 
-            "type":
-            "need",
+        fallback[
+            "short_description"
+        ] = text
 
-            "category":
-            "general",
-
-            "urgency":
-            3,
-
-            "short_description":
-            text,
-
-            "team":
-            "Community Team"
-        }
+        return fallback
