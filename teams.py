@@ -10,10 +10,10 @@ TEAM_NUMBERS = {
     "whatsapp:+917411395906",
 
     "Utility Team":
-    "whatsapp:+918082094901",
+    "whatsapp:+918369366339",
 
     "Civic Team":
-    "whatsapp:+918369366339",
+    "whatsapp:+918082094901",
 
     "Community Team":
     "whatsapp:+919845401200",
