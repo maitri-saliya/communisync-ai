@@ -1,48 +1,157 @@
-from fastapi import APIRouter
-from fastapi.templating import Jinja2Templates
-from fastapi import Request
+import streamlit as st
+import pandas as pd
 
-from database import Session
-from database import Need
+from database import SessionLocal
+from models import RequestLog
 
 
-router = APIRouter()
+# ----------------------------------
+# PAGE CONFIG
+# ----------------------------------
 
-templates = (
-    Jinja2Templates(
-        directory="templates"
-    )
+st.set_page_config(
+
+    page_title="CommuniSync Dashboard",
+
+    page_icon="🌍",
+
+    layout="wide"
 )
 
 
-@router.get("/dashboard")
-def dashboard(
-    request: Request
+# ----------------------------------
+# REFRESH
+# ----------------------------------
+
+if st.button(
+
+    "🔄 Refresh Dashboard",
+
+    key="refresh"
 ):
 
-    session = Session()
+    st.rerun()
 
-    rows = (
-        session
-        .query(Need)
-        .order_by(
-            Need.id.desc()
+
+# ----------------------------------
+# LOAD DATA
+# ----------------------------------
+
+
+def load_requests():
+
+    db = SessionLocal()
+
+    try:
+
+        return (
+            db.query(RequestLog)
+            .order_by(
+                RequestLog.id.desc()
+            )
+            .all()
         )
-        .all()
+
+    finally:
+
+        db.close()
+
+
+requests = load_requests()
+
+
+# ----------------------------------
+# HEADER
+# ----------------------------------
+
+st.title(
+    "🌍 CommuniSync Dashboard"
+)
+
+st.caption(
+    "AI-Powered Community Coordination"
+)
+
+st.divider()
+
+
+# ----------------------------------
+# METRICS
+# ----------------------------------
+
+col1, col2, col3 = st.columns(3)
+
+
+with col1:
+
+    st.metric(
+        "Total Requests",
+        len(requests)
     )
 
-    return templates.TemplateResponse(
 
-        "dashboard.html",
+with col2:
 
-        {
-            "request":
-            request,
+    st.metric(
+        "Pending",
+        len([
+            x
+            for x in requests
+            if x.status == "Pending"
+        ])
+    )
 
-            "rows":
-            rows,
 
-            "total":
-            len(rows)
-        }
+with col3:
+
+    st.metric(
+        "Resolved",
+        len([
+            x
+            for x in requests
+            if x.status == "Resolved"
+        ])
+    )
+
+
+st.divider()
+
+
+# ----------------------------------
+# TABLE
+# ----------------------------------
+
+rows = []
+
+for r in requests:
+
+    rows.append({
+
+        "ID": r.id,
+
+        "Category": r.category,
+
+        "Priority": r.priority,
+
+        "Team": r.assigned_team,
+
+        "Status": r.status,
+
+        "Description": r.description
+    })
+
+
+if rows:
+
+    df = pd.DataFrame(rows)
+
+    st.dataframe(
+        df,
+        use_container_width=True
+    )
+
+else:
+
+    st.info(
+        "No requests yet"
     )

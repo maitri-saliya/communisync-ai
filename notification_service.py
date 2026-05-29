@@ -1,36 +1,56 @@
 import os
+
 from twilio.rest import Client
 
 
+# ----------------------------------
+# TWILIO
+# ----------------------------------
+
 client = Client(
-    os.getenv("TWILIO_ACCOUNT_SID"),
-    os.getenv("TWILIO_AUTH_TOKEN")
+
+    os.getenv(
+        "TWILIO_ACCOUNT_SID"
+    ),
+
+    os.getenv(
+        "TWILIO_AUTH_TOKEN"
+    )
 )
 
-FROM_NUMBER = os.getenv(
-    "TWILIO_WHATSAPP_NUMBER"
-)
+
+# ----------------------------------
+# SEND ASSIGNMENT
+# ----------------------------------
 
 
 def send_assignment(
+
     to_number,
+
     requester,
+
     category,
+
     description,
+
     urgency,
-    is_match=True
+
+    assigned_team
 ):
 
-    status = (
-        "✅ MATCH FOUND"
-        if is_match
-        else "🚨 NEW REQUEST"
-    )
+    try:
 
-    body = f"""
-{status}
+        client.messages.create(
 
-CommuniSync AI
+            from_=os.getenv(
+                "TWILIO_WHATSAPP_NUMBER"
+            ),
+
+            to=to_number,
+
+            body=f"""
+🚨 CommuniSync Alert
 
 Requester:
 {requester}
@@ -41,19 +61,21 @@ Category:
 Urgency:
 {urgency}/5
 
-Requirement:
+Assigned Team:
+{assigned_team}
+
+Issue:
 {description}
-
-Please respond if available.
 """
+        )
 
-    try:
-
-        client.messages.create(
-            body=body,
-            from_=FROM_NUMBER,
-            to=to_number
+        print(
+            f"Notification sent to {to_number}"
         )
 
     except Exception as e:
-        print(e)
+
+        print(
+            "Twilio Error:",
+            str(e)
+        )

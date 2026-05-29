@@ -1,9 +1,9 @@
 fastapi
 uvicorn
-openai
-twilio
-python-dotenv
-jinja2
+streamlit
 sqlalchemy
-requests
+openai
+python-dotenv
 python-multipart
+twilio
+pandas

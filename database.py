@@ -1,38 +1,38 @@
-from sqlalchemy import *
-from sqlalchemy.orm import *
+import os
 
-engine=create_engine(
-    "sqlite:///communi.db",
-    connect_args={
-        "check_same_thread":False
-    }
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "sqlite:///./communisync.db"
 )
 
-Base=declarative_base()
 
-class Need(Base):
+engine = create_engine(
 
-    __tablename__="needs"
+    DATABASE_URL,
 
-    id=Column(
-        Integer,
-        primary_key=True
-    )
+    connect_args={
+        "check_same_thread": False
+    }
 
-    user=Column(String)
+    if DATABASE_URL.startswith("sqlite")
 
-    contact=Column(String)
+    else {}
+)
 
-    category=Column(String)
 
-    type=Column(String)
+SessionLocal = sessionmaker(
 
-    urgency=Column(Integer)
+    autocommit=False,
 
-    description=Column(String)
+    autoflush=False,
 
-Session=sessionmaker(
     bind=engine
 )
 
-Base.metadata.create_all(engine)
+
+Base = declarative_base()

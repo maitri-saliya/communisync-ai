@@ -43,7 +43,7 @@ DEFAULT_RESULT = {
     "Medium",
 
     "short_description":
-    "",
+    "General issue",
 
     "team":
     "Community Team",
@@ -57,6 +57,7 @@ DEFAULT_RESULT = {
 # AI UNDERSTANDING
 # ----------------------------------
 
+
 def understand(text):
 
     try:
@@ -69,8 +70,7 @@ def understand(text):
                 ),
 
                 response_format={
-                    "type":
-                    "json_object"
+                    "type": "json_object"
                 },
 
                 temperature=0,
@@ -78,82 +78,54 @@ def understand(text):
                 messages=[
 
                     {
-                        "role":
-                        "system",
+                        "role": "system",
 
-                        "content":
-"""
+                        "content": """
 You are CommuniSync AI.
 
-You classify community issues and requests.
+Classify community requests.
 
 Return ONLY valid JSON.
 
-Schema:
-
 {
     "type":"need|offer",
-
     "category":"single lowercase word",
-
     "urgency":1-5,
-
     "priority":"Low|Medium|High",
-
     "short_description":"brief summary",
-
-    "team":"Utility Team|Civic Team|Community Team|Repair Team|Maintenance Team|Neighbor",
-
+    "team":"Utility Team|Civic Team|Community Team|Repair Team|Transport Team",
     "suggested_action":"short action"
 }
 
-Classification Rules:
-
-- Streetlight problems -> Civic Team
-- Roads / potholes -> Civic Team
-- Garbage / drainage / sewage -> Utility Team
-- Water supply -> Utility Team
-- Electricity -> Utility Team
-- Broken equipment -> Maintenance Team
-- Appliance repair -> Repair Team
-- Borrow / help / assistance -> Neighbor
-- Food / health / donation -> Community Team
-- Community event -> Community Team
-
-Urgency Rules:
-
-5 = emergency / danger / medical
-4 = severe disruption
-3 = standard issue
-2 = minor issue
-1 = suggestion / low importance
-
-Priority Mapping:
-
-urgency 1-2 -> Low
-urgency 3 -> Medium
-urgency 4-5 -> High
-
 Rules:
 
-- Always assign exactly one team.
-- Never return null.
-- Keep category short.
-- Use lowercase category.
-- Keep suggested_action under 10 words.
-- If uncertain use:
-  team = Community Team
+- Streetlight / roads -> Civic Team
+- Water / electricity / garbage -> Utility Team
+- Appliance / equipment repair -> Repair Team
+- Delivery / transport -> Transport Team
+- Food / health / events -> Community Team
+- Unknown -> Community Team
+
+Urgency:
+5 = emergency
+4 = severe
+3 = normal
+2 = minor
+1 = suggestion
+
+Priority:
+1-2 = Low
+3 = Medium
+4-5 = High
+
+No explanation.
 """
                     },
 
                     {
-                        "role":
-                        "user",
-
-                        "content":
-                        text
+                        "role": "user",
+                        "content": text
                     }
-
                 ]
             )
         )
@@ -165,55 +137,21 @@ Rules:
             .content
         )
 
-        result = json.loads(
-            content
-        )
-
-        # ----------------------------------
-        # SAFETY FALLBACKS
-        # ----------------------------------
+        result = json.loads(content)
 
         for key, value in DEFAULT_RESULT.items():
 
             if (
-
                 key not in result
                 or result[key] in [None, ""]
-
             ):
 
                 result[key] = value
-
-        # Ensure urgency valid
-
-        if not isinstance(
-            result["urgency"],
-            int
-        ):
-
-            result["urgency"] = 3
-
-        result["urgency"] = max(
-            1,
-            min(
-                5,
-                result["urgency"]
-            )
-        )
 
         return result
 
     except Exception as e:
 
-        print(
-            "Azure AI Error:",
-            str(e)
-        )
+        print("Azure Error:", str(e))
 
-        fallback = DEFAULT_RESULT.copy()
-
-        fallback[
-            "short_description"
-        ] = text
-
-        return fallback
+        return DEFAULT_RESULT

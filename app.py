@@ -1,71 +1,21 @@
 from fastapi import FastAPI, Form
 from fastapi.responses import Response
+
 from twilio.twiml.messaging_response import MessagingResponse
 
-from database import Session, Need
-from ai_service import understand
-from matcher import find_match
+from database import SessionLocal
+from models import RequestLog
 
-from dashboard import router as dashboard_router
+from ai_service import understand
+from matcher import route_request
+
+
+# ----------------------------------
+# APP
+# ----------------------------------
 
 app = FastAPI()
 
-app.include_router(
-    dashboard_router
-)
-
-@app.on_event(
-"startup"
-)
-
-def seed():
-
-    session=Session()
-
-    if (
-        session
-        .query(Need)
-        .count()
-        ==0
-    ):
-
-        session.add_all([
-
-Need(
-user="Food Volunteer",
-
-contact=
-"whatsapp:+918369366339",
-
-category="food",
-
-type="offer",
-
-urgency=1,
-
-description=
-"Meals available"
-),
-
-Need(
-user="Community Team",
-
-contact=
-"whatsapp:+919845401200",
-
-category="general",
-
-type="offer",
-
-urgency=1,
-
-description=
-"General support"
-)
-
-])
-
-        session.commit()
 
 @app.get("/")
 def health():
@@ -75,33 +25,42 @@ def health():
     }
 
 
+# ----------------------------------
+# WHATSAPP WEBHOOK
+# ----------------------------------
+
 @app.post("/webhook")
 async def webhook(
 
     Body: str = Form(...),
 
     From: str = Form(...)
-
 ):
+
+    db = SessionLocal()
 
     try:
 
-        # --------------------
-        # AI Extraction
-        # --------------------
+        # ----------------------------------
+        # AI UNDERSTANDING
+        # ----------------------------------
 
         result = understand(Body)
 
-        result["requester"] = From
+        print(result)
 
-        category = result.get(
-            "category",
-            "general"
-        )
+        # ----------------------------------
+        # EXTRACT
+        # ----------------------------------
 
         request_type = result.get(
             "type",
             "need"
+        )
+
+        category = result.get(
+            "category",
+            "general"
         )
 
         urgency = result.get(
@@ -109,68 +68,77 @@ async def webhook(
             3
         )
 
+        priority = result.get(
+            "priority",
+            "Medium"
+        )
+
+        team = result.get(
+            "team",
+            "Community Team"
+        )
+
+        action = result.get(
+            "suggested_action",
+            "Manual review"
+        )
+
         description = result.get(
             "short_description",
             Body
         )
 
-        # --------------------
-        # Save request
-        # --------------------
+        # ----------------------------------
+        # SAVE TO DB
+        # ----------------------------------
 
-        session = Session()
+        row = RequestLog(
 
-        row = Need(
-
-            user=From,
-
-            contact=From,
+            requester=From,
 
             category=category,
 
-            type=request_type,
+            request_type=request_type,
 
             urgency=urgency,
+
+            priority=priority,
+
+            assigned_team=team,
+
+            suggested_action=action,
+
+            description=description,
+
+            status="Pending"
+        )
+
+        db.add(row)
+
+        db.commit()
+
+        db.refresh(row)
+
+        # ----------------------------------
+        # ROUTE REQUEST
+        # ----------------------------------
+
+        route_request(
+
+            requester=From,
+
+            category=category,
+
+            urgency=urgency,
+
+            team=team,
 
             description=description
         )
 
-        session.add(row)
-
-        session.commit()
-
-        # --------------------
-        # Match + Notify
-        # --------------------
-
-        matched, message = find_match(
-            {
-                "requester":
-                From,
-
-                "type":
-                request_type,
-
-                "category":
-                category,
-
-                "urgency":
-                urgency,
-
-                "team":
-                result.get(
-                "team"
-                ),
-
-                "short_description":
-                description
-            }
-
-        )
-
-        # --------------------
-        # WhatsApp Reply
-        # --------------------
+        # ----------------------------------
+        # USER REPLY
+        # ----------------------------------
 
         response = MessagingResponse()
 
@@ -178,21 +146,22 @@ async def webhook(
 f"""
 🤝 CommuniSync AI
 
-Request received.
-
-Type:
-{request_type}
+Request ID:
+CS-{row.id}
 
 Category:
 {category}
 
-Urgency:
-{urgency}/5
+Priority:
+{priority}
 
-Details:
-{description}
+Assigned Team:
+{team}
 
-{message}
+Suggested Action:
+{action}
+
+Your request has been routed.
 """
         )
 
@@ -221,3 +190,7 @@ Support team has been notified.
             content=str(response),
             media_type="application/xml"
         )
+
+    finally:
+
+        db.close()
